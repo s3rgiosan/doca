@@ -480,7 +480,8 @@ button:disabled {
   color: var(--muted);
 }
 
-.suspended-icon {
+.suspended-icon,
+.pinned-icon {
   flex-shrink: 0;
   color: var(--muted);
 }

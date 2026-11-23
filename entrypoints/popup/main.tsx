@@ -9,9 +9,10 @@ import { getSettings } from '@/lib/store/device';
 import { getBindings } from '@/lib/store/session';
 import { listWorkspaces } from '@/lib/store/workspaces';
 import type { PickerRow } from '@/lib/ui/picker';
-import { splitPinned, tabLabel, withoutManager } from '@/lib/ui/sidebar';
+import { tabLabel, withoutManager } from '@/lib/ui/sidebar';
 import { useAction } from '@/lib/ui/useAction';
 import { Favicon } from '@/lib/ui/Favicon';
+import { PinnedIcon } from '@/lib/ui/PinnedIcon';
 import { SuspendedIcon } from '@/lib/ui/SuspendedIcon';
 import { WorkspacePicker } from '@/lib/ui/WorkspacePicker';
 import '@/lib/ui/theme.css';
@@ -57,32 +58,9 @@ async function loadState(): Promise<State> {
 
 const rowLabel = (row: PickerRow) => (row.kind === 'new' ? `New workspace "${row.name}"` : row.ws.name);
 
-/** Tab rows. A click goes to the tab. */
-function TabRows(props: { tabs: PortTab[]; onGo(tabId: number): void }) {
-  return (
-    <ul class="tab-list">
-      {props.tabs.map((tab) => (
-        <li key={tab.id}>
-          <button class="plain tab-row" title={tab.url} onClick={() => props.onGo(tab.id)}>
-            <Favicon src={tab.favIconUrl} />
-            <span class="tab-row-title">{tabLabel(tab)}</span>
-            {tab.discarded && <SuspendedIcon />}
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/**
- * The tabs of the workspace. When the window keeps its pinned tabs, they show first in their own
- * group, because they do not belong to the workspace.
- */
-function TabList(props: { name: string; tabs: PortTab[]; keepPinnedTabs: boolean }) {
+/** The tabs of the workspace. A click goes to the tab. */
+function TabList(props: { name: string; tabs: PortTab[] }) {
   const [error, setError] = useState('');
-  const pinnedId = useId();
-  const workspaceId = useId();
-  const { pinned, workspace } = splitPinned(props.tabs, props.keepPinnedTabs);
   const goTo = (tabId: number) => {
     setError('');
     browser.tabs.update(tabId, { active: true }).then(
@@ -94,23 +72,19 @@ function TabList(props: { name: string; tabs: PortTab[]; keepPinnedTabs: boolean
     <div class="popup">
       <header class="head">{props.name}</header>
       <div role="alert">{error && <p class="error">{error}</p>}</div>
-      {pinned.length > 0 && (
-        <section class="tab-group" aria-labelledby={pinnedId}>
-          <h2 id={pinnedId} class="group-label">
-            Pinned in this window
-          </h2>
-          <TabRows tabs={pinned} onGo={goTo} />
-        </section>
-      )}
-      <section class="tab-group" aria-labelledby={pinned.length > 0 ? workspaceId : undefined}>
-        {pinned.length > 0 && (
-          <h2 id={workspaceId} class="group-label">
-            In this workspace
-          </h2>
-        )}
-        <TabRows tabs={workspace} onGo={goTo} />
-        {workspace.length === 0 && <p class="muted">This workspace has no other tabs.</p>}
-      </section>
+      <ul class="tab-list">
+        {props.tabs.map((tab) => (
+          <li key={tab.id}>
+            <button class="plain tab-row" title={tab.url} onClick={() => goTo(tab.id)}>
+              <Favicon src={tab.favIconUrl} />
+              <span class="tab-row-title">{tabLabel(tab)}</span>
+              {tab.pinned && <PinnedIcon />}
+              {tab.discarded && <SuspendedIcon />}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {props.tabs.length === 0 && <p class="muted">This workspace has no other tabs.</p>}
     </div>
   );
 }
@@ -156,7 +130,7 @@ function Popup() {
   }
   if (state.onManager) {
     const name = state.workspaces.find((ws) => ws.id === state.boundTo)?.name ?? 'This window';
-    return <TabList name={name} tabs={state.windowTabs} keepPinnedTabs={state.keepPinnedTabs} />;
+    return <TabList name={name} tabs={state.windowTabs} />;
   }
 
   /** Sends the message and closes the popup when it succeeds. */

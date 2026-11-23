@@ -5,6 +5,21 @@ All notable changes to Doca will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The tab lists in the Doca tab and the toolbar popup mark a pinned tab with a pin icon.
+
+### Changed
+
+- The Doca tab and the toolbar popup list pinned tabs with the other tabs again, with no **Pinned in this window** heading.
+- Settings clears the "Settings saved." message when you open another section.
+
+### Fixed
+
+- The toolbar popup no longer shows a second line under the workspace name.
+
 ## [1.2.0] - 2026-11-23
 
 ### Added

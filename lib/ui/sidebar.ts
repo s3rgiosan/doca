@@ -41,17 +41,6 @@ export function withoutManager<T extends { url: string }>(tabs: T[], managerBase
   return tabs.filter((tab) => parseManagerUrl(managerBase, tab.url) === null);
 }
 
-/**
- * Splits the tabs of a window into the pinned tabs that the window keeps and the tabs of the workspace.
- * When the window does not keep its pinned tabs, every tab belongs to the workspace.
- */
-export function splitPinned<T extends { pinned: boolean }>(tabs: T[], keepPinned: boolean): { pinned: T[]; workspace: T[] } {
-  if (!keepPinned) {
-    return { pinned: [], workspace: tabs };
-  }
-  return { pinned: tabs.filter((tab) => tab.pinned), workspace: tabs.filter((tab) => !tab.pinned) };
-}
-
 /** What the main area of the manager page shows. */
 export type MainView = 'workspace' | 'no-workspaces' | 'deleted';
 

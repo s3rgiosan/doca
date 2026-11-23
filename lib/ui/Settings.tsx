@@ -72,6 +72,12 @@ export function Settings(props: Props) {
     props.onDirtyChange?.(dirty);
   }, [dirty]);
 
+  /** Shows another section. A message belongs to the section that showed it, so it goes away. */
+  const showSection = (next: Section) => {
+    setSection(next);
+    report(true, '');
+  };
+
   const report = (ok: boolean, text: string) => {
     setStatus(ok ? text : '');
     setError(ok ? '' : text);
@@ -143,7 +149,7 @@ export function Settings(props: Props) {
             type="button"
             class={`plain settings-nav-item${item.id === section ? ' selected' : ''}`}
             aria-current={item.id === section ? 'true' : undefined}
-            onClick={() => setSection(item.id)}
+            onClick={() => showSection(item.id)}
           >
             <Icon icon={item.icon} />
             {item.label}
