@@ -1,6 +1,7 @@
 import type { BrowserPort, PortTab } from '../browser/port';
 import { managerTabWorkspace, managerUrl, parseManagerUrl } from '../model/manager-url';
-import { getSkipFallback, setSkipFallback } from '../store/device';
+import { normalizeUrl, type SavedTab } from '../model/workspace';
+import { getSettings, getSkipFallback, setSkipFallback } from '../store/device';
 import { markDirty } from '../store/dirty';
 import {
   bindWindow,
@@ -21,6 +22,9 @@ import { saveWindow } from './save';
  * Shows another workspace in this window. The current workspace is saved first, and its tabs close
  * only after that save succeeds. A workspace that is open in another window gets the focus instead.
  * A window with no workspace keeps its tabs, and the workspace opens in a new window.
+ *
+ * When the window keeps its pinned tabs, the pinned tabs stay open. A pinned saved tab of the new
+ * workspace does not open when a pinned tab with the same address is already open.
  *
  * When a step fails before the old tabs close, the window shows the old workspace again and the new
  * tabs close. When a step fails after that, the window keeps the new workspace. In both cases the
@@ -56,6 +60,7 @@ export async function switchWindow(port: BrowserPort, windowId: number, targetWs
   }
   await saveWindow(port, windowId, now);
 
+  const { keepPinnedTabs } = await getSettings();
   const current = (await port.getWindow(windowId))?.tabs ?? win.tabs;
   const managerId = current.find((tab) => parseManagerUrl(port.managerBase, tab.url) === sourceWsId)?.id;
   const targetSkipped = (await getSkipFallback()).has(targetWsId);
@@ -74,12 +79,13 @@ export async function switchWindow(port: BrowserPort, windowId: number, targetWs
     } else {
       await port.createTab({ windowId, url: targetUrl, index: 0, pinned: true, active: false });
     }
-    const { opened, failed } = await openSavedTabs(port, windowId, target.tabs, true);
+    const toOpen = keepPinnedTabs ? withoutOpenPinned(target.tabs, current, port.managerBase) : target.tabs;
+    const { opened, failed } = await openSavedTabs(port, windowId, toOpen, true);
     createdIds.push(...opened.map((entry) => entry.tab.id));
     await setNotOpened(targetWsId, failed, true);
 
     // The old tabs close before the wait for the new addresses, so a change in an old tab cannot reach the new workspace.
-    const closing = await sourceTabsToClose(port, windowId, sourceWsId, new Set(createdIds), now);
+    const closing = await sourceTabsToClose(port, windowId, sourceWsId, new Set(createdIds), keepPinnedTabs, now);
     await removeLiveTabs(port, windowId, closing);
     sourceClosed = true;
     await forgetTabIds(closing);
@@ -96,19 +102,31 @@ export async function switchWindow(port: BrowserPort, windowId: number, targetWs
 }
 
 /**
+ * Returns the saved tabs without each pinned saved tab whose address is already open in a pinned tab
+ * of the window. The manager tab does not count.
+ */
+function withoutOpenPinned(saved: SavedTab[], live: PortTab[], managerBase: string): SavedTab[] {
+  const openPinned = new Set(
+    live.filter((tab) => tab.pinned && managerTabWorkspace(managerBase, tab) === null).map((tab) => normalizeUrl(tab.url)),
+  );
+  return saved.filter((tab) => !tab.pinned || !openPinned.has(normalizeUrl(tab.finalUrl || tab.url)));
+}
+
+/**
  * Returns the IDs of the old workspace's tabs that are still in the window. A tab that is not in the
  * old workspace's saved list opened after the save, so it is added to that list first. A tab with no
- * address cannot be saved, so it stays in the window.
+ * address cannot be saved, so it stays in the window. With `keepPinned`, pinned tabs stay in the window.
  */
 async function sourceTabsToClose(
   port: BrowserPort,
   windowId: number,
   sourceWsId: string,
   keep: Set<number>,
+  keepPinned: boolean,
   now: number,
 ): Promise<number[]> {
   const tabs = ((await port.getWindow(windowId))?.tabs ?? []).filter(
-    (tab) => !keep.has(tab.id) && managerTabWorkspace(port.managerBase, tab) === null,
+    (tab) => !keep.has(tab.id) && !(keepPinned && tab.pinned) && managerTabWorkspace(port.managerBase, tab) === null,
   );
   const savedIds = new Set(((await getWorkspace(sourceWsId))?.tabs ?? []).map((tab) => tab.id));
   const tabMap = await getTabMap();

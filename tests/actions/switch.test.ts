@@ -4,12 +4,22 @@ import { saveWindow } from '@/lib/actions/save';
 import { switchWindow } from '@/lib/actions/switch';
 import { createFromWindow } from '@/lib/actions/window';
 import { parseManagerUrl } from '@/lib/model/manager-url';
-import { newWorkspace, type SavedTab } from '@/lib/model/workspace';
-import { getSkipFallback } from '@/lib/store/device';
+import { newWorkspace, normalizeUrl, type SavedTab } from '@/lib/model/workspace';
+import { getSkipFallback, setSettings } from '@/lib/store/device';
 import { nextDue } from '@/lib/store/dirty';
 import { isRestoring, markStartupDone, setRestoring, windowForWorkspace } from '@/lib/store/session';
 import { getWorkspace, putWorkspace } from '@/lib/store/workspaces';
 import { createFakePort, FAKE_MANAGER_BASE as base, type FakePort } from '../helpers/fake-port';
+
+const keepPinned = (on: boolean) => setSettings({ suspendAfterMinutes: 20, allowlist: [], keepPinnedTabs: on });
+
+/** A window with `https://a1.test/` and a pinned `https://mail.test/`, saved as workspace A. */
+async function windowWithMail(port: FakePort) {
+  const win = await port.createWindow('https://a1.test/');
+  const mail = await port.createTab({ windowId: win.id, url: 'https://mail.test/', pinned: true, active: false });
+  const a = await createFromWindow(port, win.id, 'A', 2);
+  return { win: win.id, mailId: mail.id, a };
+}
 
 async function windowWith(port: FakePort, urls: string[]) {
   const win = await port.createWindow(urls[0]!);
@@ -143,6 +153,89 @@ describe('switchWindow', () => {
     const before = (await tabsIn(port, win)).map((t) => t.url);
     await switchWindow(port, win, a, 5);
     expect((await tabsIn(port, win)).map((t) => t.url)).toEqual(before);
+  });
+});
+
+describe('switchWindow pinned tabs', () => {
+  beforeEach(async () => {
+    fakeBrowser.reset();
+    await markStartupDone();
+  });
+
+  it('closes pinned tabs with the setting off', async () => {
+    await closedB();
+    const port = createFakePort();
+    const { win, a } = await windowWithMail(port);
+
+    await switchWindow(port, win, 'b', 5);
+
+    expect((await tabsIn(port, win)).map((t) => t.url)).not.toContain('https://mail.test/');
+    expect((await getWorkspace(a))!.tabs.find((t) => t.url === 'https://mail.test/')?.pinned).toBe(true);
+  });
+});
+
+describe('switchWindow with keepPinnedTabs', () => {
+  beforeEach(async () => {
+    fakeBrowser.reset();
+    await markStartupDone();
+    await keepPinned(true);
+  });
+
+  it('keeps pinned tabs open', async () => {
+    await closedB();
+    const port = createFakePort();
+    const { win, mailId } = await windowWithMail(port);
+
+    await switchWindow(port, win, 'b', 5);
+
+    const tabs = await tabsIn(port, win);
+    const mail = tabs.find((t) => t.id === mailId);
+    expect(mail?.url).toBe('https://mail.test/');
+    expect(mail?.pinned).toBe(true);
+    expect(tabs.map((t) => t.url)).not.toContain('https://a1.test/');
+    expect(tabs.map((t) => t.url)).toEqual(expect.arrayContaining(['https://b1.test/', 'https://b2.test/']));
+    expect(tabs.find((t) => t.url === 'https://b2.test/')!.pinned).toBe(true);
+  });
+
+  it('does not open a saved pinned tab that is already open', async () => {
+    await putWorkspace(
+      newWorkspace({
+        id: 'b',
+        name: 'B',
+        deviceId: 'd',
+        now: 0,
+        tabs: [savedTab('b1', 'https://b1.test/', false, 0), savedTab('bm', 'https://MAIL.test/#inbox', true, 1)],
+      }),
+      1,
+    );
+    const port = createFakePort();
+    const { win, mailId } = await windowWithMail(port);
+
+    await switchWindow(port, win, 'b', 5);
+
+    const mails = (await tabsIn(port, win)).filter((t) => normalizeUrl(t.url) === 'https://mail.test/');
+    expect(mails.map((t) => t.id)).toEqual([mailId]);
+  });
+
+  it('keeps pinned tabs when the switch rolls back', async () => {
+    await closedB();
+    const port = createFakePort();
+    const { win } = await windowWithMail(port);
+    const removeTabs = port.removeTabs.bind(port);
+    let calls = 0;
+    port.removeTabs = async (ids) => {
+      calls += 1;
+      if (calls <= 2) {
+        throw new Error('Tabs cannot be edited right now');
+      }
+      await removeTabs(ids);
+    };
+
+    await expect(switchWindow(port, win, 'b', 5)).rejects.toThrow('cannot be edited');
+
+    const urls = (await tabsIn(port, win)).map((t) => t.url);
+    expect(urls).toEqual(expect.arrayContaining(['https://a1.test/', 'https://mail.test/']));
+    expect(urls.filter((url) => url.startsWith('https://b'))).toEqual([]);
   });
 });
 

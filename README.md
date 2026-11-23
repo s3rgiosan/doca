@@ -46,6 +46,7 @@ Open **Settings** at the bottom of the sidebar. You can also open the settings p
 
 - **Tab suspender.** Set the minutes after which an idle tab is suspended. The default is 20. `0` means never. The setting is the same for all workspaces. Doca does not suspend the active tab, pinned tabs, tabs that play sound, and the Doca tab.
 - **Allowlist.** List the hosts whose tabs Doca never suspends, one per line. A host also covers its subdomains.
+- **Pinned tabs.** Turn on **Keep pinned tabs** to keep pinned tabs open when the window switches to another workspace. Pinned tabs then belong to the window. Doca does not save them in a workspace. The setting is off by default.
 - **Backup.** **Export** downloads your workspaces as a JSON file. **Import** reads such a file and adds its workspaces. Import never replaces a workspace. A workspace that already exists is added again with "(imported)" after its name. Export your workspaces from time to time. The export file is your only backup.
 
 When you close the settings in the Doca tab with edits that are not saved, Doca asks **Save changes?**. The settings page asks the browser to confirm before you leave it with edits that are not saved.

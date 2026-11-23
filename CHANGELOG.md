@@ -5,6 +5,12 @@ All notable changes to Doca will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- A **Keep pinned tabs** setting keeps pinned tabs open when the window switches to another workspace. Doca then does not save pinned tabs in a workspace.
+
 ## [1.1.0] - 2026-11-19
 
 ### Added
