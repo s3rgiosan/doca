@@ -49,6 +49,17 @@ describe('captureTabs', () => {
   });
 });
 
+describe('captureTabs skipPinned', () => {
+  it('leaves out pinned tabs with skipPinned', () => {
+    const tabs = [manager, { ...live(2, 1, 'https://mail.test/'), pinned: true }, live(3, 2, 'https://a.test/')];
+    const skipped = captureTabs(tabs, [], new Map(), base, ids(), { skipPinned: true });
+    expect(skipped.tabs.map((t) => [t.url, t.index])).toEqual([['https://a.test/', 0]]);
+    expect(skipped.tabIds).toEqual([[3, 'new1']]);
+    const all = captureTabs(tabs, [], new Map(), base, ids());
+    expect(all.tabs.map((t) => t.url)).toEqual(['https://mail.test/', 'https://a.test/']);
+  });
+});
+
 describe('sameTabs', () => {
   it('compares the saved fields in order', () => {
     const a = [saved('s1', 'https://a.test/', 0)];

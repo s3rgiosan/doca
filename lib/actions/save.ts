@@ -1,5 +1,6 @@
 import type { BrowserPort } from '../browser/port';
 import { captureTabs, sameTabs, type CaptureResult } from '../model/capture';
+import { getSettings } from '../store/device';
 import { markDirty, takeDue } from '../store/dirty';
 import { getBindings, getNotOpened, getTabMap, isRestoring, isStartupDone, setTabIds, windowForWorkspace } from '../store/session';
 import { updateWorkspace } from '../store/workspaces';
@@ -7,7 +8,7 @@ import { updateWorkspace } from '../store/workspaces';
 /**
  * Saves the tabs of a bound window into its workspace. It does nothing before startup binding is
  * done, while the workspace is being restored, or when the tabs did not change. Saved tabs that could
- * not open stay at the end of the list.
+ * not open stay at the end of the list. When the window keeps its pinned tabs, pinned tabs are not saved.
  */
 export async function saveWindow(port: BrowserPort, windowId: number, now: number): Promise<void> {
   const startupDone = await isStartupDone();
@@ -24,6 +25,7 @@ export async function saveWindow(port: BrowserPort, windowId: number, now: numbe
   }
   const tabMap = await getTabMap();
   const notOpened = await getNotOpened(wsId);
+  const { keepPinnedTabs } = await getSettings();
   let captured: CaptureResult | null = null;
   await updateWorkspace(
     wsId,
@@ -31,7 +33,7 @@ export async function saveWindow(port: BrowserPort, windowId: number, now: numbe
       if (ws.deleted) {
         return null;
       }
-      captured = captureTabs(win.tabs, ws.tabs, tabMap, port.managerBase, () => crypto.randomUUID());
+      captured = captureTabs(win.tabs, ws.tabs, tabMap, port.managerBase, () => crypto.randomUUID(), { skipPinned: keepPinnedTabs });
       const liveIds = new Set(captured.tabs.map((tab) => tab.id));
       const kept = ws.tabs.filter((tab) => notOpened.has(tab.id) && !liveIds.has(tab.id));
       const tabs = [...captured.tabs, ...kept].map((tab, index) => ({ ...tab, index }));

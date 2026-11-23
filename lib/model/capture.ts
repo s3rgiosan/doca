@@ -15,8 +15,15 @@ export interface CaptureResult {
   tabIds: Array<[number, string]>;
 }
 
+/** Options for `captureTabs`. */
+export interface CaptureOptions {
+  /** When true, pinned tabs are left out, because they belong to the window. */
+  skipPinned?: boolean;
+}
+
 /**
- * Turns the tabs of a window into a saved list. The manager tab is left out.
+ * Turns the tabs of a window into a saved list. The manager tab is left out. With `skipPinned`, pinned
+ * tabs are left out too.
  * A tab keeps its saved ID when the tab map names it. After a restart the map is empty, so a tab then
  * claims the first unclaimed saved tab with the same normalized URL.
  */
@@ -26,6 +33,7 @@ export function captureTabs(
   tabMap: Map<number, string>,
   managerBase: string,
   newId: () => string,
+  options: CaptureOptions = {},
 ): CaptureResult {
   const byId = new Map(previous.map((tab) => [tab.id, tab]));
   // Saved tabs named by the map are reserved first, so a URL match cannot take them from their own tab.
@@ -43,7 +51,7 @@ export function captureTabs(
 
   for (const tab of ordered) {
     const managerWs = parseManagerUrl(managerBase, tab.url);
-    if (managerWs !== null) {
+    if (managerWs !== null || (options.skipPinned && tab.pinned)) {
       continue;
     }
     const match = findSaved(tab, byId, previous, tabMap, claimed, reserved);

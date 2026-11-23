@@ -2,7 +2,7 @@ import type { BrowserPort, PortTab } from '../browser/port';
 import { captureTabs } from '../model/capture';
 import { parseManagerUrl } from '../model/manager-url';
 import { isWorkspaceColor, newWorkspace, nextColor, normalizeUrl, tombstone, type Workspace, type WorkspaceColor } from '../model/workspace';
-import { getDeviceId, getSkipFallback, setSkipFallback } from '../store/device';
+import { getDeviceId, getSettings, getSkipFallback, setSkipFallback } from '../store/device';
 import { markDirty } from '../store/dirty';
 import {
   bindWindow,
@@ -23,7 +23,10 @@ import { ensureManagerTab, openSavedTabs, openWorkspace, suspendOpenedTabs } fro
 import { saveWindow } from './save';
 import { switchWindow } from './switch';
 
-/** Saves the tabs of a window as a new workspace and binds the window to it. Returns the workspace ID. */
+/**
+ * Saves the tabs of a window as a new workspace and binds the window to it. When the window keeps its
+ * pinned tabs, pinned tabs are not saved. Returns the workspace ID.
+ */
 export async function createFromWindow(
   port: BrowserPort,
   windowId: number,
@@ -37,7 +40,8 @@ export async function createFromWindow(
     throw new Error(`Window ${windowId} does not exist`);
   }
   const id = crypto.randomUUID();
-  const captured = captureTabs(win.tabs, [], await getTabMap(), port.managerBase, () => crypto.randomUUID());
+  const { keepPinnedTabs } = await getSettings();
+  const captured = captureTabs(win.tabs, [], await getTabMap(), port.managerBase, () => crypto.randomUUID(), { skipPinned: keepPinnedTabs });
   const ws = newWorkspace({ id, name, deviceId: await getDeviceId(), now, tabs: captured.tabs, color: chosen });
   await putWorkspace(ws, now);
   await setTabIds(captured.tabIds);

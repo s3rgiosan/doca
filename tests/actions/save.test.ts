@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { flushDue, saveWindow } from '@/lib/actions/save';
+import { createFromWindow } from '@/lib/actions/window';
 import { managerUrl } from '@/lib/model/manager-url';
 import { newWorkspace } from '@/lib/model/workspace';
+import { setSettings } from '@/lib/store/device';
 import { markDirty, nextDue } from '@/lib/store/dirty';
 import { bindWindow, markStartupDone, setRestoring } from '@/lib/store/session';
 import { getWorkspace, putWorkspace } from '@/lib/store/workspaces';
@@ -39,6 +41,48 @@ describe('saveWindow', () => {
     await port.createTab({ windowId, url: 'https://y.test/', active: false });
     await saveWindow(port, windowId, 7);
     expect((await getWorkspace('a'))!.rev).toBe(first.rev + 1);
+  });
+});
+
+describe('saveWindow with keepPinnedTabs', () => {
+  const keepPinned = (on: boolean) => setSettings({ suspendAfterMinutes: 20, allowlist: [], keepPinnedTabs: on });
+  const urls = async (wsId: string) => (await getWorkspace(wsId))!.tabs.map((t) => t.url);
+
+  async function windowWithPinned() {
+    const port = createFakePort();
+    const win = await port.createWindow('https://a1.test/');
+    const mail = await port.createTab({ windowId: win.id, url: 'https://mail.test/', pinned: true, active: false });
+    return { port, windowId: win.id, mailId: mail.id };
+  }
+
+  beforeEach(async () => {
+    fakeBrowser.reset();
+    await markStartupDone();
+    await keepPinned(true);
+  });
+
+  it('does not save pinned tabs', async () => {
+    const { port, windowId } = await windowWithPinned();
+    const a = await createFromWindow(port, windowId, 'A', 2);
+    expect(await urls(a)).toEqual(['https://a1.test/']);
+  });
+
+  it('drops saved pinned tabs from the workspace', async () => {
+    await keepPinned(false);
+    const { port, windowId } = await windowWithPinned();
+    const a = await createFromWindow(port, windowId, 'A', 2);
+    expect(await urls(a)).toContain('https://mail.test/');
+    await keepPinned(true);
+    await saveWindow(port, windowId, 5);
+    expect(await urls(a)).toEqual(['https://a1.test/']);
+  });
+
+  it('saves a tab after it is unpinned', async () => {
+    const { port, windowId, mailId } = await windowWithPinned();
+    const a = await createFromWindow(port, windowId, 'A', 2);
+    port.windows.flatMap((w) => w.tabs).find((t) => t.id === mailId)!.pinned = false;
+    await saveWindow(port, windowId, 5);
+    expect(await urls(a)).toContain('https://mail.test/');
   });
 });
 
