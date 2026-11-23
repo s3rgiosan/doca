@@ -19,3 +19,4 @@ Do these checks in Chrome and in Brave. Load the build from `.output/chrome-mv3`
 | 13 | After a delete or a move, **Undo** brings back the workspace or the tabs. Deleting the workspace of the current window closes the Doca tab with no undo. | | | |
 | 14 | Settings with unsaved edits ask **Save changes?** in the Doca tab. The settings page asks before it closes. | | | |
 | 15 | Resting the pointer on a sidebar workspace, other than the current one, shows a card with its saved tabs. The card stays open while the pointer moves onto it, and `Escape`, a click or a scroll closes it. Keyboard focus on the workspace opens it too. | | | |
+| 16 | With **Keep pinned tabs** on, switching workspace keeps the pinned tabs open and opens no second copy of them. The Doca tab and the popup list them under **Pinned in this window**. With the setting off, pinned tabs close and come back with their workspace. | | | |
