@@ -31,12 +31,14 @@ export interface StartupPlan {
 /**
  * Decides which window belongs to which workspace after a browser start.
  * A manager tab binds its window first. Windows with no valid manager tab then bind by URL overlap.
+ * With `skipPinned`, pinned tabs belong to the window, so the overlap leaves them out.
  */
 export function planStartupBindings(
   windows: PortWindow[],
   workspaces: Workspace[],
   skipFallback: Set<string>,
   managerBase: string,
+  skipPinned = false,
 ): StartupPlan {
   const live = new Map(workspaces.filter((ws) => !ws.deleted).map((ws) => [ws.id, ws]));
   const bindings = new Map<number, string>();
@@ -65,6 +67,7 @@ export function planStartupBindings(
     ordered.filter((win) => !bindings.has(win.id)),
     candidates,
     managerBase,
+    skipPinned,
   );
   const byOverlap = new Set<number>();
   for (const pair of pairs) {
@@ -84,7 +87,7 @@ interface Pair {
 }
 
 /** The best workspace of each window, when it reaches the threshold and no other workspace ties it. Highest score first. */
-function overlapPairs(windows: PortWindow[], workspaces: Workspace[], managerBase: string): Pair[] {
+function overlapPairs(windows: PortWindow[], workspaces: Workspace[], managerBase: string, skipPinned: boolean): Pair[] {
   const savedUrls = workspaces.map((ws) => ({
     id: ws.id,
     urls: new Set(ws.tabs.map((tab) => normalizeUrl(tab.finalUrl || tab.url))),
@@ -92,7 +95,9 @@ function overlapPairs(windows: PortWindow[], workspaces: Workspace[], managerBas
   const pairs: Pair[] = [];
   for (const win of windows) {
     const urls = new Set(
-      win.tabs.filter((tab) => parseManagerUrl(managerBase, tab.url) === null).map((tab) => normalizeUrl(tab.url)),
+      win.tabs
+        .filter((tab) => parseManagerUrl(managerBase, tab.url) === null && !(skipPinned && tab.pinned))
+        .map((tab) => normalizeUrl(tab.url)),
     );
     const scores = savedUrls.map((ws) => ({ wsId: ws.id, score: jaccard(urls, ws.urls) }));
     const best = Math.max(0, ...scores.map((s) => s.score));

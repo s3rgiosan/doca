@@ -123,7 +123,8 @@ export async function onManagerTabSeen(port: BrowserPort, tab: PortTab): Promise
 export async function runStartup(port: BrowserPort, now: number): Promise<void> {
   const windows = await port.getWindows();
   const workspaces = await listWorkspaces({ includeDeleted: true });
-  const plan = planStartupBindings(windows, workspaces, await getSkipFallback(), port.managerBase);
+  const { keepPinnedTabs } = await getSettings();
+  const plan = planStartupBindings(windows, workspaces, await getSkipFallback(), port.managerBase, keepPinnedTabs);
   for (const [windowId, wsId] of plan.bindings) {
     await bindWindow(windowId, wsId);
   }

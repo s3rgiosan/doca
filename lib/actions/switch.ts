@@ -102,14 +102,14 @@ export async function switchWindow(port: BrowserPort, windowId: number, targetWs
 }
 
 /**
- * Returns the saved tabs without each pinned saved tab whose address is already open in a pinned tab
- * of the window. The manager tab does not count.
+ * Returns the saved tabs without each pinned saved tab whose first or last address is already open in
+ * a pinned tab of the window. The manager tab does not count.
  */
 function withoutOpenPinned(saved: SavedTab[], live: PortTab[], managerBase: string): SavedTab[] {
   const openPinned = new Set(
     live.filter((tab) => tab.pinned && managerTabWorkspace(managerBase, tab) === null).map((tab) => normalizeUrl(tab.url)),
   );
-  return saved.filter((tab) => !tab.pinned || !openPinned.has(normalizeUrl(tab.finalUrl || tab.url)));
+  return saved.filter((tab) => !tab.pinned || (!openPinned.has(normalizeUrl(tab.url)) && !openPinned.has(normalizeUrl(tab.finalUrl))));
 }
 
 /**

@@ -114,3 +114,13 @@ describe('planStartupBindings', () => {
     expect([...plan.bindings]).toEqual([[1, 'a']]);
   });
 });
+
+describe('planStartupBindings with pinned tabs kept by the window', () => {
+  it('leaves pinned tabs out of the overlap', () => {
+    const w = win(1, ['https://mail.test/', 'https://chat.test/', 'https://a.test/']);
+    w.tabs[0]!.pinned = true;
+    w.tabs[1]!.pinned = true;
+    expect(planStartupBindings([w], [ws('a', ['https://a.test/'])], new Set(), base, true).bindings.get(1)).toBe('a');
+    expect(planStartupBindings([w], [ws('a', ['https://a.test/'])], new Set(), base).bindings.has(1)).toBe(false);
+  });
+});

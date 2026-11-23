@@ -217,6 +217,18 @@ describe('switchWindow with keepPinnedTabs', () => {
     expect(mails.map((t) => t.id)).toEqual([mailId]);
   });
 
+  it('does not open a saved pinned tab whose first address is open', async () => {
+    const redirected: SavedTab = { ...savedTab('bm', 'https://mail.test/', true, 1), finalUrl: 'https://mail.test/u/0/' };
+    await putWorkspace(newWorkspace({ id: 'b', name: 'B', deviceId: 'd', now: 0, tabs: [savedTab('b1', 'https://b1.test/', false, 0), redirected] }), 1);
+    const port = createFakePort();
+    const { win, mailId } = await windowWithMail(port);
+
+    await switchWindow(port, win, 'b', 5);
+
+    const mails = (await tabsIn(port, win)).filter((t) => t.url.startsWith('https://mail.test/'));
+    expect(mails.map((t) => t.id)).toEqual([mailId]);
+  });
+
   it('keeps pinned tabs when the switch rolls back', async () => {
     await closedB();
     const port = createFakePort();
