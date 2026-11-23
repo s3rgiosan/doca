@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A **Keep pinned tabs** setting keeps pinned tabs open when the window switches to another workspace. Doca then does not save pinned tabs in a workspace.
+- A **Keep pinned tabs** setting keeps pinned tabs open when the window switches to another workspace. Doca then does not save pinned tabs in a workspace, and the Doca tab and the toolbar popup show them in their own group.
 
 ## [1.1.0] - 2026-11-19
 

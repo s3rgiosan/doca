@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newWorkspace } from '@/lib/model/workspace';
-import { filterTabs, mainView, sidebarGroups, withoutManager } from '@/lib/ui/sidebar';
+import { filterTabs, mainView, sidebarGroups, splitPinned, withoutManager } from '@/lib/ui/sidebar';
 
 const ws = (id: string, name: string) => newWorkspace({ id, name, deviceId: 'd', now: 0 });
 
@@ -71,6 +71,26 @@ describe('withoutManager', () => {
       { url: 'https://b.test/' },
     ];
     expect(withoutManager(tabs, base)).toEqual([tabs[1], tabs[2]]);
+  });
+});
+
+describe('splitPinned', () => {
+  const tabs = [
+    { id: 1, pinned: true },
+    { id: 2, pinned: false },
+    { id: 3, pinned: true },
+  ];
+
+  it('puts pinned tabs in their own group when the window keeps them', () => {
+    const split = splitPinned(tabs, true);
+    expect(split.pinned.map((t) => t.id)).toEqual([1, 3]);
+    expect(split.workspace.map((t) => t.id)).toEqual([2]);
+  });
+
+  it('keeps every tab in the workspace group when the setting is off', () => {
+    const split = splitPinned(tabs, false);
+    expect(split.pinned).toEqual([]);
+    expect(split.workspace.map((t) => t.id)).toEqual([1, 2, 3]);
   });
 });
 

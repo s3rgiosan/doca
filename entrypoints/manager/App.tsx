@@ -4,10 +4,11 @@ import { toPortTab, type PortTab } from '@/lib/browser/port';
 import { nextColor, workspaceColor, type Workspace } from '@/lib/model/workspace';
 import type { MoveResult } from '@/lib/actions/move';
 import { sendMessage, type Message, type Reply } from '@/lib/messages';
+import { getSettings } from '@/lib/store/device';
 import { getBindings } from '@/lib/store/session';
 import { listWorkspaces } from '@/lib/store/workspaces';
 import type { PickerRow } from '@/lib/ui/picker';
-import { filterTabs, mainView, sidebarGroups, withoutManager } from '@/lib/ui/sidebar';
+import { filterTabs, mainView, sidebarGroups, splitPinned, withoutManager } from '@/lib/ui/sidebar';
 import { useAction } from '@/lib/ui/useAction';
 import { ActionMenu } from '@/lib/ui/ActionMenu';
 import { Favicon } from '@/lib/ui/Favicon';
@@ -43,18 +44,21 @@ interface State {
   workspaces: Workspace[];
   bound: Set<string>;
   tabs: PortTab[];
+  /** True when pinned tabs belong to the window, not to the workspace. */
+  keepPinnedTabs: boolean;
 }
 
 async function loadState(): Promise<State> {
   const win = await browser.windows.getCurrent();
   const windowId = win.id ?? null;
-  const [workspaces, bindings, rawTabs] = await Promise.all([
+  const [workspaces, bindings, rawTabs, settings] = await Promise.all([
     listWorkspaces(),
     getBindings(),
     windowId === null ? Promise.resolve([]) : browser.tabs.query({ windowId }),
+    getSettings(),
   ]);
   const tabs = withoutManager(rawTabs.map(toPortTab), managerBase);
-  return { windowId, workspaces, bound: new Set(bindings.values()), tabs };
+  return { windowId, workspaces, bound: new Set(bindings.values()), tabs, keepPinnedTabs: settings.keepPinnedTabs };
 }
 
 /**
@@ -245,6 +249,7 @@ export function App() {
 
   const groups = useMemo(() => sidebarGroups(state?.workspaces ?? [], state?.bound ?? new Set(), query, wsId), [state, query]);
   const tabs = useMemo(() => filterTabs(state?.tabs ?? [], query), [state, query]);
+  const tabGroups = useMemo(() => splitPinned(tabs, state?.keepPinnedTabs ?? false), [tabs, state]);
 
   if (!state) {
     return (
@@ -682,39 +687,49 @@ export function App() {
               </button>
             </>
           ) : (
-            <span class="selection-info muted">{tabCount(tabs.length)}</span>
+            <span class="selection-info muted">{tabCount(tabGroups.workspace.length)}</span>
           )}
         </div>
       </div>
 
+      {tabGroups.pinned.length > 0 && (
+        <>
+          <h2 class="tab-group">Pinned in this window</h2>
+          <ul class="tabs" aria-label="Pinned in this window">
+            {tabGroups.pinned.map(tabRow)}
+          </ul>
+          <h2 class="tab-group">In this workspace</h2>
+        </>
+      )}
       <ul class="tabs">
-        {tabs.map((tab) => {
-          const { title, showUrl } = tabLabelParts(tab.title, tab.url);
-          return (
-          <li
-            key={tab.id}
-            class={`tab-row${tab.active ? ' active' : ''}`}
-            draggable
-            onDragStart={(event) => event.dataTransfer?.setData(DRAG_TYPE, String(tab.id))}
-          >
-            <input type="checkbox" checked={selected.has(tab.id)} onChange={() => toggle(tab.id)} aria-label={`Select ${title}`} />
-            <Favicon src={tab.favIconUrl} />
-            <button
-              class={`tab-title plain${showUrl ? '' : ' url-title'}`}
-              title={tab.url}
-              onClick={() => goToTab(tab.id)}
-            >
-              {title}
-            </button>
-            {showUrl && <span class="tab-url">{shortUrl(tab.url)}</span>}
-            {tab.discarded && <SuspendedIcon />}
-          </li>
-          );
-        })}
+        {tabGroups.workspace.map(tabRow)}
       </ul>
+      {tabGroups.workspace.length === 0 && tabGroups.pinned.length > 0 && (
+        <p class="muted">{query ? 'No workspace tab matches the search.' : 'This workspace has no tabs.'}</p>
+      )}
       {tabs.length === 0 && <p class="muted">{query ? 'No tab matches the search.' : 'This window has no other tabs.'}</p>}
     </>
   );
+
+  function tabRow(tab: PortTab) {
+    const { title, showUrl } = tabLabelParts(tab.title, tab.url);
+    return (
+      <li
+        key={tab.id}
+        class={`tab-row${tab.active ? ' active' : ''}`}
+        draggable
+        onDragStart={(event) => event.dataTransfer?.setData(DRAG_TYPE, String(tab.id))}
+      >
+        <input type="checkbox" checked={selected.has(tab.id)} onChange={() => toggle(tab.id)} aria-label={`Select ${title}`} />
+        <Favicon src={tab.favIconUrl} />
+        <button class={`tab-title plain${showUrl ? '' : ' url-title'}`} title={tab.url} onClick={() => goToTab(tab.id)}>
+          {title}
+        </button>
+        {showUrl && <span class="tab-url">{shortUrl(tab.url)}</span>}
+        {tab.discarded && <SuspendedIcon />}
+      </li>
+    );
+  }
 
   return (
     <div class="layout">
