@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
+import { storage } from 'wxt/utils/storage';
 import { newWorkspace, tombstone } from '@/lib/model/workspace';
 import { getDeviceId, getSettings } from '@/lib/store/device';
 import { getWorkspace, listWorkspaces, putWorkspace, removeWorkspace } from '@/lib/store/workspaces';
@@ -58,6 +59,11 @@ describe('device store', () => {
   });
 
   it('gives default settings', async () => {
-    expect(await getSettings()).toEqual({ suspendAfterMinutes: 20, allowlist: [] });
+    expect(await getSettings()).toEqual({ suspendAfterMinutes: 20, allowlist: [], keepPinnedTabs: false });
+  });
+
+  it('reads a missing keepPinnedTabs as false', async () => {
+    await storage.setItem('local:device.settings', { suspendAfterMinutes: 5, allowlist: [] });
+    expect(await getSettings()).toEqual({ suspendAfterMinutes: 5, allowlist: [], keepPinnedTabs: false });
   });
 });

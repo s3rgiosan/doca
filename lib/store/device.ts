@@ -6,13 +6,15 @@ export interface Settings {
   suspendAfterMinutes: number;
   /** Hosts whose tabs are never suspended. A host also covers its subdomains. */
   allowlist: string[];
+  /** When true, pinned tabs belong to the window. They stay open on a workspace switch and are not saved in a workspace. */
+  keepPinnedTabs: boolean;
 }
 
 const MAX_SUSPEND_MINUTES = 525_600;
 const MAX_ALLOWLIST_ENTRIES = 1000;
 const MAX_ALLOWLIST_ENTRY_LENGTH = 253;
 
-const DEFAULT_SETTINGS: Settings = { suspendAfterMinutes: 20, allowlist: [] };
+const DEFAULT_SETTINGS: Settings = { suspendAfterMinutes: 20, allowlist: [], keepPinnedTabs: false };
 
 const deviceIdItem = storage.defineItem<string>('local:device.id');
 const settingsItem = storage.defineItem<Settings>('local:device.settings', { fallback: DEFAULT_SETTINGS });
@@ -30,16 +32,21 @@ export function getDeviceId(): Promise<string> {
   });
 }
 
+/** Settings stored by an older version can miss a field, so each missing field gets its default. */
 export async function getSettings(): Promise<Settings> {
-  return settingsItem.getValue();
+  const stored = await settingsItem.getValue();
+  return { ...DEFAULT_SETTINGS, ...stored };
 }
 
-/** Throws an Error when the value is not a valid `Settings`. Returns a copy that has only the known fields. */
+/**
+ * Throws an Error when the value is not a valid `Settings`. Returns a copy that has only the known fields.
+ * A missing `keepPinnedTabs` is false.
+ */
 export function validateSettings(value: unknown): Settings {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error('The settings are not an object.');
   }
-  const { suspendAfterMinutes, allowlist } = value as Record<string, unknown>;
+  const { suspendAfterMinutes, allowlist, keepPinnedTabs = false } = value as Record<string, unknown>;
   if (typeof suspendAfterMinutes !== 'number' || !Number.isInteger(suspendAfterMinutes) || suspendAfterMinutes < 0 || suspendAfterMinutes > MAX_SUSPEND_MINUTES) {
     throw new Error(`The suspend time must be a whole number of minutes from 0 to ${MAX_SUSPEND_MINUTES}.`);
   }
@@ -49,7 +56,10 @@ export function validateSettings(value: unknown): Settings {
   if (!allowlist.every((entry) => typeof entry === 'string' && entry.length <= MAX_ALLOWLIST_ENTRY_LENGTH)) {
     throw new Error(`Each allowlist entry must be text of at most ${MAX_ALLOWLIST_ENTRY_LENGTH} characters.`);
   }
-  return { suspendAfterMinutes, allowlist: [...(allowlist as string[])] };
+  if (typeof keepPinnedTabs !== 'boolean') {
+    throw new Error('The keep pinned tabs setting must be true or false.');
+  }
+  return { suspendAfterMinutes, allowlist: [...(allowlist as string[])], keepPinnedTabs };
 }
 
 export function setSettings(settings: Settings): Promise<void> {

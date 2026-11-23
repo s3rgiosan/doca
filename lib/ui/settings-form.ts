@@ -5,6 +5,7 @@ export interface SettingsForm {
   globalMinutes: string;
   /** One host per line. */
   allowlist: string;
+  keepPinnedTabs: boolean;
 }
 
 /** The global timeout that an empty or invalid field saves. */
@@ -33,6 +34,7 @@ export function formValues(form: SettingsForm): SettingsValues {
   return {
     suspendAfterMinutes: parseMinutes(form.globalMinutes) ?? DEFAULT_MINUTES,
     allowlist: parseAllowlist(form.allowlist),
+    keepPinnedTabs: form.keepPinnedTabs,
   };
 }
 
@@ -43,7 +45,7 @@ export function formValues(form: SettingsForm): SettingsValues {
 export function hasUnsavedChanges(form: SettingsForm, stored: SettingsForm): boolean {
   const next = formValues(form);
   const before = formValues(stored);
-  if (next.suspendAfterMinutes !== before.suspendAfterMinutes) {
+  if (next.suspendAfterMinutes !== before.suspendAfterMinutes || next.keepPinnedTabs !== before.keepPinnedTabs) {
     return true;
   }
   return next.allowlist.join('\n') !== before.allowlist.join('\n');

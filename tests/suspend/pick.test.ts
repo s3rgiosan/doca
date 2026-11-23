@@ -22,7 +22,7 @@ const tab = (over: Partial<PortTab> = {}): PortTab => ({
 const ctx = (over: Partial<SuspendContext> = {}): SuspendContext => ({
   now,
   managerBase: base,
-  settings: { suspendAfterMinutes: 20, allowlist: [] },
+  settings: { suspendAfterMinutes: 20, allowlist: [], keepPinnedTabs: false },
   ...over,
 });
 
@@ -47,14 +47,14 @@ describe('pickTabsToDiscard', () => {
 
   it('never discards when the timeout is 0', () => {
     const t = tab({ lastAccessed: 0 });
-    expect(pickTabsToDiscard([t], ctx({ settings: { suspendAfterMinutes: 0, allowlist: [] } }))).toEqual([]);
+    expect(pickTabsToDiscard([t], ctx({ settings: { suspendAfterMinutes: 0, allowlist: [], keepPinnedTabs: false } }))).toEqual([]);
   });
 
   it('skips allowlisted hosts and their subdomains only', () => {
     const sub = tab({ url: 'https://docs.example.com/x' });
     const exact = tab({ url: 'https://example.com/' });
     const other = tab({ url: 'https://badexample.com/' });
-    const result = pickTabsToDiscard([sub, exact, other], ctx({ settings: { suspendAfterMinutes: 20, allowlist: ['example.com'] } }));
+    const result = pickTabsToDiscard([sub, exact, other], ctx({ settings: { suspendAfterMinutes: 20, allowlist: ['example.com'], keepPinnedTabs: false } }));
     expect(result).toEqual([other.id]);
   });
 

@@ -63,6 +63,12 @@
   display: block;
 }
 
+.settings label.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .settings textarea {
   font-family: var(--font-mono);
   font-size: var(--text-sm);

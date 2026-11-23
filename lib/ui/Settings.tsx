@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from 'preact/hooks';
 import { sendMessage } from '../messages';
 import { getSettings } from '../store/device';
 import { Icon } from './Icon';
-import { HardDrive, Timer } from './icons';
+import { HardDrive, Pin, Timer } from './icons';
 import { formValues, hasUnsavedChanges, type SettingsForm } from './settings-form';
 import { useAction } from './useAction';
 import './settings.css';
@@ -11,30 +11,32 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-type Section = 'suspender' | 'backup';
+type Section = 'suspender' | 'pinned' | 'backup';
 
 const SECTIONS = [
   { id: 'suspender', label: 'Tab suspender', icon: Timer },
+  { id: 'pinned', label: 'Pinned tabs', icon: Pin },
   { id: 'backup', label: 'Backup', icon: HardDrive },
 ] as const;
 
 interface Props {
   /** The level of the section heading. The page sets it below its own headings. */
   headingLevel: 2 | 3;
-  /** Gets true when the suspender fields have changes that are not saved, and false after a save. */
+  /** Gets true when the settings fields have changes that are not saved, and false after a save. */
   onDirtyChange?(dirty: boolean): void;
   /** Gets the save function, so that the page can save before it closes the settings. It resolves to true on success. */
   saveRef?: { current: (() => Promise<boolean>) | null };
 }
 
 /**
- * The suspender settings and the backup in two panes: the sections on the left, the selected section
+ * The suspender settings, the pinned tab setting and the backup in two panes: the sections on the left, the selected section
  * on the right. The settings page and the Doca tab both show it.
  */
 export function Settings(props: Props) {
   const [section, setSection] = useState<Section>('suspender');
   const [globalMinutes, setGlobalMinutes] = useState('20');
   const [allowlist, setAllowlist] = useState('');
+  const [keepPinnedTabs, setKeepPinnedTabs] = useState(false);
   // The form as it was last loaded from storage. Null until the first load ends.
   const [stored, setStored] = useState<SettingsForm | null>(null);
   const [status, setStatus] = useState('');
@@ -50,6 +52,7 @@ export function Settings(props: Props) {
     const form: SettingsForm = {
       globalMinutes: String(settings.suspendAfterMinutes),
       allowlist: settings.allowlist.join('\n'),
+      keepPinnedTabs: settings.keepPinnedTabs,
     };
     setStored(form);
     if (keepEdits) {
@@ -57,13 +60,14 @@ export function Settings(props: Props) {
     }
     setGlobalMinutes(form.globalMinutes);
     setAllowlist(form.allowlist);
+    setKeepPinnedTabs(form.keepPinnedTabs);
   };
 
   useEffect(() => {
     load().catch(() => report(false, 'Doca could not load the settings.'));
   }, []);
 
-  const dirty = stored !== null && hasUnsavedChanges({ globalMinutes, allowlist }, stored);
+  const dirty = stored !== null && hasUnsavedChanges({ globalMinutes, allowlist, keepPinnedTabs }, stored);
   useEffect(() => {
     props.onDirtyChange?.(dirty);
   }, [dirty]);
@@ -73,10 +77,10 @@ export function Settings(props: Props) {
     setError(ok ? '' : text);
   };
 
-  /** Saves the suspender fields. A failed save keeps the fields as they are, so no edit is lost. */
+  /** Saves the settings fields. A failed save keeps the fields as they are, so no edit is lost. */
   const save = async (): Promise<boolean> => {
     const saved = await run(async () => {
-      const reply = await sendMessage({ type: 'set-settings', settings: formValues({ globalMinutes, allowlist }) });
+      const reply = await sendMessage({ type: 'set-settings', settings: formValues({ globalMinutes, allowlist, keepPinnedTabs }) });
       report(reply.ok, reply.ok ? 'Settings saved.' : reply.error);
       if (reply.ok) {
         try {
@@ -154,6 +158,20 @@ export function Settings(props: Props) {
             <input id={minutesId} type="number" min="0" value={globalMinutes} onInput={(event) => setGlobalMinutes(event.currentTarget.value)} />
             <label for={allowlistId}>Never suspend these hosts (one per line; a host also covers its subdomains)</label>
             <textarea id={allowlistId} rows={3} value={allowlist} onInput={(event) => setAllowlist(event.currentTarget.value)} />
+            <button class="primary" disabled={busy} onClick={() => void save()}>
+              Save settings
+            </button>
+          </section>
+        )}
+
+        {section === 'pinned' && (
+          <section aria-labelledby={`${minutesId}-pinned`}>
+            <Heading id={`${minutesId}-pinned`}>Pinned tabs</Heading>
+            <label class="check">
+              <input type="checkbox" checked={keepPinnedTabs} onChange={(event) => setKeepPinnedTabs(event.currentTarget.checked)} />
+              Keep pinned tabs open when the window switches workspace
+            </label>
+            <p class="muted">Pinned tabs then belong to the window and are not saved in a workspace.</p>
             <button class="primary" disabled={busy} onClick={() => void save()}>
               Save settings
             </button>

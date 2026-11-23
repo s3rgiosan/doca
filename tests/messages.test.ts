@@ -96,9 +96,15 @@ describe('handleMessage', () => {
   });
 
   it('saves settings', async () => {
-    const settings = { suspendAfterMinutes: 30, allowlist: ['example.com'] };
+    const settings = { suspendAfterMinutes: 30, allowlist: ['example.com'], keepPinnedTabs: true };
     await handleMessage({ type: 'set-settings', settings }, createFakePort(), now);
     expect(await getSettings()).toEqual(settings);
+  });
+
+  it('saves settings without keepPinnedTabs as off', async () => {
+    const settings = { suspendAfterMinutes: 30, allowlist: [] };
+    await handleMessage({ type: 'set-settings', settings } as unknown as Message, createFakePort(), now);
+    expect((await getSettings()).keepPinnedTabs).toBe(false);
   });
 
   it.each([
@@ -109,6 +115,7 @@ describe('handleMessage', () => {
     ['allowlist not an array', { suspendAfterMinutes: 5, allowlist: 'example.com' }],
     ['allowlist with a number', { suspendAfterMinutes: 5, allowlist: [1] }],
     ['missing allowlist', { suspendAfterMinutes: 5 }],
+    ['keepPinnedTabs not a boolean', { suspendAfterMinutes: 5, allowlist: [], keepPinnedTabs: 'yes' }],
     ['null', null],
   ])('rejects settings with %s', async (_label, settings) => {
     const reply = await handleMessage({ type: 'set-settings', settings } as unknown as Message, createFakePort(), now);
